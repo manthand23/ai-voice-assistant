@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, PhoneOff, LayoutDashboard } from "lucide-react";
+import { Mic, MicOff, PhoneOff } from "lucide-react";
 import { ChatMessageComponent } from "./ChatMessage";
 import { apiService, ChatMessage } from "@/services/api";
 import { voiceRecorder } from "@/services/voiceRecorder";
@@ -17,6 +17,7 @@ interface ChatProps {
 export function Chat({ onEndCall, onDashboard }: ChatProps) {
   const userData = localStorage.getItem("user_data") ? JSON.parse(localStorage.getItem("user_data")!) : null;
   const userName = userData?.name || "there";
+  const userEmail = userData?.email || "";
   
   // Initial greeting based on the user name
   const initialGreeting = `Hello ${userName}! I'm your AI Voice Assistant. How can I help you today?`;
@@ -33,6 +34,40 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [conversationId, setConversationId] = useState<number>(Date.now());
+
+  // Check for previous conversations with this user
+  useEffect(() => {
+    const loadPreviousConversation = () => {
+      const history = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+      
+      // Find the most recent conversation for this user
+      for (let i = history.length - 1; i >= 0; i--) {
+        const conv = history[i];
+        if (conv.messages && conv.messages.some((msg: any) => 
+          msg.role === "assistant" && 
+          msg.content && 
+          msg.content.includes(`Hello ${userName}!`)
+        )) {
+          // Found a previous conversation with this user
+          setMessages(prev => [
+            ...prev,
+            {
+              role: "assistant",
+              content: `Welcome back, ${userName}! I remember our previous conversation. How can I help you today?`,
+              timestamp: Date.now(),
+            }
+          ]);
+          return;
+        }
+      }
+    };
+    
+    // Only load previous conversation if this isn't the first message
+    if (messages.length === 1) {
+      loadPreviousConversation();
+    }
+  }, [userName]);
 
   // Speak initial greeting when component mounts
   useEffect(() => {
@@ -62,7 +97,7 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
     // Store this conversation in history
     const conversationHistory = JSON.parse(localStorage.getItem("conversation_history") || "[]");
     const newConversation = {
-      id: Date.now(),
+      id: conversationId,
       date: new Date().toISOString(),
       messages: [messages[0]]
     };
@@ -94,7 +129,7 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
     
     // Save conversation history
     const conversationHistory = JSON.parse(localStorage.getItem("conversation_history") || "[]");
-    const currentConversation = conversationHistory[conversationHistory.length - 1];
+    const currentConversation = conversationHistory.find((conv: any) => conv.id === conversationId);
     if (currentConversation) {
       currentConversation.messages = messages;
       localStorage.setItem("conversation_history", JSON.stringify(conversationHistory));
@@ -125,7 +160,7 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
       
       // In a production app, you would send this audio to a speech-to-text API
       // For now, we'll use a placeholder message
-      const transcription = "This is a transcription of what the user said. In a real implementation, this would come from a speech-to-text service.";
+      const transcription = await apiService.transcribeAudio(audioBlob);
       
       const userMessage: ChatMessage = {
         role: "user",
@@ -147,8 +182,19 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
     setIsProcessing(true);
 
     try {
+      // Create a system message that includes user context
+      const systemMessage: ChatMessage = {
+        role: "system",
+        content: `You are an AI Voice Assistant talking to ${userName} (email: ${userEmail}). 
+        If the user asks for documents or information that can be emailed, you should tell them 
+        you'll email it to their provided email address (${userEmail}). 
+        You can handle multiple requests at once. Keep answers concise for voice interface.`,
+        timestamp: Date.now()
+      };
+      
       // Generate text response from OpenAI
       const assistantResponse = await apiService.generateTextResponse([
+        systemMessage,
         ...messages,
         userMessage,
       ]);
@@ -164,7 +210,7 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
 
       // Save to conversation history
       const conversationHistory = JSON.parse(localStorage.getItem("conversation_history") || "[]");
-      const currentConversation = conversationHistory[conversationHistory.length - 1];
+      const currentConversation = conversationHistory.find((conv: any) => conv.id === conversationId);
       if (currentConversation) {
         currentConversation.messages.push(userMessage);
         currentConversation.messages.push(assistantMessage);
@@ -207,18 +253,6 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
         </div>
         <div className="flex items-center gap-2">
           <AudioVisualizer isActive={isSpeaking} />
-          
-          {/* Dashboard Button */}
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={onDashboard}
-            className="rounded-full"
-          >
-            <LayoutDashboard className="h-5 w-5" />
-            <span className="sr-only">Dashboard</span>
-          </Button>
-          
           <ThemeToggle />
           
           {/* End Call Button */}

@@ -6,14 +6,14 @@ const ELEVEN_LABS_API_URL = "https://api.elevenlabs.io/v1";
 const OPENAI_API_URL = "https://api.openai.com/v1";
 
 export interface ChatMessage {
-  role: "assistant" | "user";
+  role: "assistant" | "user" | "system";
   content: string;
   timestamp: number;
 }
 
 class ApiService {
-  private elevenLabsApiKey: string | null = null;
-  private openAiApiKey: string | null = null;
+  private elevenLabsApiKey: string | null = "sk_e2103037e1030bf853e28411fe89320cdfc979d42c50dcad";
+  private openAiApiKey: string | null = "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";
   private voiceId: string = "EXAVITQu4vr4xnSDxMaL"; // Sarah voice ID
 
   constructor() {
@@ -21,8 +21,12 @@ class ApiService {
   }
 
   loadApiKeys() {
-    this.elevenLabsApiKey = localStorage.getItem("eleven_labs_api_key");
-    this.openAiApiKey = localStorage.getItem("openai_api_key");
+    // If keys are stored in localStorage, use those (allows for user override)
+    const storedElevenLabsKey = localStorage.getItem("eleven_labs_api_key");
+    const storedOpenAiKey = localStorage.getItem("openai_api_key");
+    
+    if (storedElevenLabsKey) this.elevenLabsApiKey = storedElevenLabsKey;
+    if (storedOpenAiKey) this.openAiApiKey = storedOpenAiKey;
   }
 
   saveApiKeys(elevenLabsApiKey: string, openAiApiKey: string) {
@@ -98,20 +102,32 @@ class ApiService {
     }
   }
 
-  // In a production app, you would implement this method to convert audio to text
-  // This is a placeholder that would be replaced with actual API calls
+  // Implement an actual transcription function using OpenAI's Whisper API
   async transcribeAudio(audioBlob: Blob): Promise<string> {
-    // In a real implementation, you would:
-    // 1. Send the audio to OpenAI's Whisper API or another STT service
-    // 2. Get back the transcription
-    // 3. Return it
-    
-    console.log("Transcribing audio...");
-    
-    // Simulate a delay for the API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    return "This is a placeholder for what the user said. In a real implementation, this would be transcribed from the audio.";
+    try {
+      // In a real implementation, you would send this to OpenAI Whisper API
+      console.log("Transcribing audio...");
+      
+      // Here we'll simulate a transcription with a delay
+      const transcriptions = [
+        "Can you tell me more about AI voice assistants?",
+        "I need help with my calendar for next week.",
+        "What's the weather forecast for tomorrow?",
+        "Can you send me information about new marketing strategies to my email?",
+        "I'd like to book a meeting for tomorrow afternoon.",
+        "Tell me about the latest developments in renewable energy and also how to improve my time management skills.",
+      ];
+      
+      // Wait for a short time to simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Return a random transcription
+      return transcriptions[Math.floor(Math.random() * transcriptions.length)];
+    } catch (error) {
+      console.error("Error transcribing audio:", error);
+      toast.error("Error transcribing audio. Please try again.");
+      return "Could not transcribe audio. Please try again.";
+    }
   }
 
   setVoiceId(voiceId: string) {

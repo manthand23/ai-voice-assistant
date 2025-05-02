@@ -35,7 +35,7 @@ const App = () => {
   };
 
   const handleBackToChat = () => {
-    setCurrentView("chat");
+    setCurrentView("welcome");
   };
 
   return (
@@ -67,6 +67,6 @@ const App = () => {
       </ThemeProvider>
     </QueryClientProvider>
   );
-};
+}
 
 export default App;

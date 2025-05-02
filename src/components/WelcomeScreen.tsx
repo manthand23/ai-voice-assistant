@@ -13,8 +13,10 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ onComplete, onDashboard }: WelcomeScreenProps) {
-  const [elevenLabsApiKey, setElevenLabsApiKey] = useState("");
-  const [openAiApiKey, setOpenAiApiKey] = useState("");
+  // Hardcoded API keys - NOTE: In a real production app, these would be environment variables
+  const elevenLabsApiKey = "sk_e2103037e1030bf853e28411fe89320cdfc979d42c50dcad";
+  const openAiApiKey = "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";
+  
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -27,22 +29,10 @@ export function WelcomeScreen({ onComplete, onDashboard }: WelcomeScreenProps) {
       setUserName(parsedData.name || "");
       setEmail(parsedData.email || "");
     }
-    
-    // Check for API keys
-    const elevenKey = localStorage.getItem("eleven_labs_api_key");
-    const openAiKey = localStorage.getItem("openai_api_key");
-    
-    if (elevenKey) setElevenLabsApiKey(elevenKey);
-    if (openAiKey) setOpenAiApiKey(openAiKey);
   }, []);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!elevenLabsApiKey || !openAiApiKey) {
-      toast.error("Both API keys are required");
-      return;
-    }
     
     if (!userName) {
       toast.error("Please enter your name");
@@ -51,7 +41,7 @@ export function WelcomeScreen({ onComplete, onDashboard }: WelcomeScreenProps) {
     
     setIsLoading(true);
     
-    // Save API keys
+    // Save API keys automatically
     apiService.saveApiKeys(elevenLabsApiKey, openAiApiKey);
     
     // Save user data
@@ -61,6 +51,15 @@ export function WelcomeScreen({ onComplete, onDashboard }: WelcomeScreenProps) {
       lastLogin: new Date().toISOString()
     };
     localStorage.setItem("user_data", JSON.stringify(userData));
+    
+    // Look for previous conversation history with this user
+    const history = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+    const userHistoryExists = history.some((conv: any) => {
+      const messages = conv.messages || [];
+      return messages.some((msg: any) => 
+        msg.content && msg.content.includes(`Hello ${userName}!`)
+      );
+    });
     
     setTimeout(() => {
       setIsLoading(false);
@@ -74,11 +73,11 @@ export function WelcomeScreen({ onComplete, onDashboard }: WelcomeScreenProps) {
         {onDashboard && (
           <Button 
             variant="outline" 
-            size="icon" 
             onClick={onDashboard}
-            title="View Dashboard"
+            className="flex items-center gap-2"
           >
             <LayoutDashboard className="h-4 w-4" />
+            <span>View Dashboard</span>
           </Button>
         )}
         <ThemeToggle />
@@ -124,37 +123,6 @@ export function WelcomeScreen({ onComplete, onDashboard }: WelcomeScreenProps) {
               </div>
             </div>
             
-            {/* API Keys Section */}
-            <div className="space-y-2 pt-4 border-t">
-              <h2 className="text-lg font-semibold">API Keys</h2>
-              
-              <div className="space-y-2">
-                <label htmlFor="elevenlabs-key" className="text-sm font-medium">
-                  ElevenLabs API Key
-                </label>
-                <Input
-                  id="elevenlabs-key"
-                  placeholder="Enter your ElevenLabs API key"
-                  value={elevenLabsApiKey}
-                  onChange={(e) => setElevenLabsApiKey(e.target.value)}
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="openai-key" className="text-sm font-medium">
-                  OpenAI API Key
-                </label>
-                <Input
-                  id="openai-key"
-                  placeholder="Enter your OpenAI API key"
-                  value={openAiApiKey}
-                  onChange={(e) => setOpenAiApiKey(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Setting up..." : "Start Talking"}
             </Button>
@@ -162,8 +130,7 @@ export function WelcomeScreen({ onComplete, onDashboard }: WelcomeScreenProps) {
         </div>
         
         <div className="text-center text-sm text-muted-foreground">
-          <p>Your API keys and personal information are stored locally in your browser.</p>
-          <p>They are never sent to our servers.</p>
+          <p>Your personal information is stored locally in your browser.</p>
         </div>
       </div>
     </div>

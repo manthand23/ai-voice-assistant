@@ -76,7 +76,7 @@ export function Dashboard({ userName, onBackToChat }: DashboardProps) {
         <h2 className="text-2xl font-bold">Admin Dashboard</h2>
         {onBackToChat && (
           <Button variant="outline" onClick={onBackToChat}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Assistant
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
           </Button>
         )}
       </div>
