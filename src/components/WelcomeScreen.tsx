@@ -5,12 +5,14 @@ import { useState, useEffect } from "react";
 import { apiService } from "@/services/api";
 import { ThemeToggle } from "./ThemeToggle";
 import { toast } from "sonner";
+import { LayoutDashboard } from "lucide-react";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
+  onDashboard?: () => void;
 }
 
-export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
+export function WelcomeScreen({ onComplete, onDashboard }: WelcomeScreenProps) {
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState("");
   const [openAiApiKey, setOpenAiApiKey] = useState("");
   const [userName, setUserName] = useState("");
@@ -68,7 +70,17 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6">
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 flex items-center gap-4">
+        {onDashboard && (
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={onDashboard}
+            title="View Dashboard"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+          </Button>
+        )}
         <ThemeToggle />
       </div>
       

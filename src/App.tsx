@@ -46,7 +46,7 @@ const App = () => {
           <Sonner />
           
           {!hasApiKeys ? (
-            <WelcomeScreen onComplete={handleSetupComplete} />
+            <WelcomeScreen onComplete={handleSetupComplete} onDashboard={handleDashboard} />
           ) : (
             <>
               {currentView === "chat" && (
@@ -56,7 +56,7 @@ const App = () => {
                 />
               )}
               {currentView === "welcome" && (
-                <WelcomeScreen onComplete={handleSetupComplete} />
+                <WelcomeScreen onComplete={handleSetupComplete} onDashboard={handleDashboard} />
               )}
               {currentView === "dashboard" && (
                 <Dashboard onBackToChat={handleBackToChat} />
