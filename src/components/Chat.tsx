@@ -1,14 +1,15 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Mic, MicOff, Send, Settings } from "lucide-react";
+import { Mic, MicOff, Send, PhoneOff, LayoutDashboard } from "lucide-react";
 import { ChatMessageComponent } from "./ChatMessage";
 import { apiService, ChatMessage } from "@/services/api";
 import { voiceRecorder } from "@/services/voiceRecorder";
 import { AudioVisualizer } from "./AudioVisualizer";
 import { ThemeToggle } from "./ThemeToggle";
 import { toast } from "sonner";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Dashboard } from "./Dashboard";
 
 const INITIAL_MESSAGES: ChatMessage[] = [
   {
@@ -20,12 +21,25 @@ const INITIAL_MESSAGES: ChatMessage[] = [
 
 export function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
-  const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const userData = localStorage.getItem("user_data");
+  const [userName, setUserName] = useState<string>(userData ? JSON.parse(userData).name : "");
+
+  useEffect(() => {
+    // Custom greeting if user name exists
+    if (userName) {
+      const customGreeting: ChatMessage = {
+        role: "assistant",
+        content: `Hello ${userName}! Welcome back. How can I help you today?`,
+        timestamp: Date.now(),
+      };
+      setMessages([customGreeting]);
+    }
+  }, [userName]);
 
   useEffect(() => {
     scrollToBottom();
@@ -35,18 +49,26 @@ export function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleSendMessage = async () => {
-    if (isProcessing || !input.trim()) return;
-
-    const userMessage: ChatMessage = {
-      role: "user",
-      content: input,
-      timestamp: Date.now(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    await processUserMessage(userMessage);
+  const handleEndCall = () => {
+    setIsSpeaking(false);
+    if (isRecording) {
+      voiceRecorder.stopRecording();
+      setIsRecording(false);
+    }
+    
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    
+    // Save conversation history if needed
+    // localStorage.setItem("conversation_history", JSON.stringify(messages));
+    
+    toast.success("Call ended successfully");
+    
+    // Navigate back to welcome screen
+    if (window.confirm("End the current call?")) {
+      window.location.reload();
+    }
   };
 
   const handleVoiceToggle = async () => {
@@ -132,7 +154,32 @@ export function Chat() {
         </div>
         <div className="flex items-center gap-2">
           <AudioVisualizer isActive={isSpeaking} />
+          
+          {/* Dashboard Button */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="rounded-full">
+                <LayoutDashboard className="h-5 w-5" />
+                <span className="sr-only">Dashboard</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent>
+              <Dashboard userName={userName} />
+            </SheetContent>
+          </Sheet>
+          
           <ThemeToggle />
+          
+          {/* End Call Button */}
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={handleEndCall}
+            className="rounded-full bg-red-500 text-white hover:bg-red-600"
+          >
+            <PhoneOff className="h-5 w-5" />
+            <span className="sr-only">End Call</span>
+          </Button>
         </div>
       </header>
 
@@ -146,32 +193,19 @@ export function Chat() {
         </div>
       </div>
 
-      {/* Input area */}
+      {/* Voice Input Button Only - No Text Input */}
       <div className="p-4 border-t">
-        <div className="max-w-3xl mx-auto flex gap-2">
+        <div className="max-w-3xl mx-auto flex justify-center">
           <Button
-            variant="outline"
-            size="icon"
+            size="lg"
             onClick={handleVoiceToggle}
-            className={isRecording ? "bg-assistant-primary text-white" : ""}
+            className={`rounded-full w-16 h-16 ${isRecording ? "bg-assistant-primary text-white" : ""}`}
           >
             {isRecording ? (
-              <MicOff className="h-5 w-5" />
+              <MicOff className="h-6 w-6" />
             ) : (
-              <Mic className="h-5 w-5" />
+              <Mic className="h-6 w-6" />
             )}
-          </Button>
-          <Input
-            placeholder="Type your message..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-            disabled={isProcessing}
-            className="flex-1"
-          />
-          <Button onClick={handleSendMessage} disabled={isProcessing || !input.trim()}>
-            <Send className="h-5 w-5 mr-2" />
-            Send
           </Button>
         </div>
       </div>

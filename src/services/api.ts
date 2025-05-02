@@ -90,6 +90,10 @@ class ApiService {
         }
       );
 
+      // Increment conversation counter
+      const totalConversations = localStorage.getItem("total_conversations") || "0";
+      localStorage.setItem("total_conversations", (parseInt(totalConversations) + 1).toString());
+
       return response.data;
     } catch (error) {
       console.error("Error generating speech:", error);
