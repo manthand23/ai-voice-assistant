@@ -1,9 +1,10 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { apiService } from "@/services/api";
 import { ThemeToggle } from "./ThemeToggle";
+import { toast } from "sonner";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
@@ -16,10 +17,33 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   
+  // Check for existing user data on load
+  useEffect(() => {
+    const userData = localStorage.getItem("user_data");
+    if (userData) {
+      const parsedData = JSON.parse(userData);
+      setUserName(parsedData.name || "");
+      setEmail(parsedData.email || "");
+    }
+    
+    // Check for API keys
+    const elevenKey = localStorage.getItem("eleven_labs_api_key");
+    const openAiKey = localStorage.getItem("openai_api_key");
+    
+    if (elevenKey) setElevenLabsApiKey(elevenKey);
+    if (openAiKey) setOpenAiApiKey(openAiKey);
+  }, []);
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!elevenLabsApiKey || !openAiApiKey) {
+      toast.error("Both API keys are required");
+      return;
+    }
+    
+    if (!userName) {
+      toast.error("Please enter your name");
       return;
     }
     
@@ -50,8 +74,8 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
       
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-assistant-primary mb-2">Echo Speak</h1>
-          <p className="text-lg text-muted-foreground">Your AI Voice Assistant</p>
+          <h1 className="text-4xl font-bold text-assistant-primary mb-2">AI Voice Assistant</h1>
+          <p className="text-lg text-muted-foreground">Your Personal AI Assistant</p>
         </div>
         
         <div className="glass-effect rounded-2xl p-6 mb-8">
@@ -120,7 +144,7 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
             </div>
             
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Setting up..." : "Get Started"}
+              {isLoading ? "Setting up..." : "Start Talking"}
             </Button>
           </form>
         </div>

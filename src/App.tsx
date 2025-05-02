@@ -7,12 +7,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { Chat } from "./components/Chat";
+import { Dashboard } from "./components/Dashboard";
 import { apiService } from "./services/api";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   const [hasApiKeys, setHasApiKeys] = useState(false);
+  const [currentView, setCurrentView] = useState<"welcome" | "chat" | "dashboard">("welcome");
   
   useEffect(() => {
     // Check if API keys are already set
@@ -21,6 +23,19 @@ const App = () => {
 
   const handleSetupComplete = () => {
     setHasApiKeys(true);
+    setCurrentView("chat");
+  };
+
+  const handleEndCall = () => {
+    setCurrentView("welcome");
+  };
+
+  const handleDashboard = () => {
+    setCurrentView("dashboard");
+  };
+
+  const handleBackToChat = () => {
+    setCurrentView("chat");
   };
 
   return (
@@ -30,10 +45,23 @@ const App = () => {
           <Toaster />
           <Sonner />
           
-          {hasApiKeys ? (
-            <Chat />
-          ) : (
+          {!hasApiKeys ? (
             <WelcomeScreen onComplete={handleSetupComplete} />
+          ) : (
+            <>
+              {currentView === "chat" && (
+                <Chat 
+                  onEndCall={handleEndCall} 
+                  onDashboard={handleDashboard} 
+                />
+              )}
+              {currentView === "welcome" && (
+                <WelcomeScreen onComplete={handleSetupComplete} />
+              )}
+              {currentView === "dashboard" && (
+                <Dashboard onBackToChat={handleBackToChat} />
+              )}
+            </>
           )}
         </TooltipProvider>
       </ThemeProvider>

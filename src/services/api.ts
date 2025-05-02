@@ -90,16 +90,28 @@ class ApiService {
         }
       );
 
-      // Increment conversation counter
-      const totalConversations = localStorage.getItem("total_conversations") || "0";
-      localStorage.setItem("total_conversations", (parseInt(totalConversations) + 1).toString());
-
       return response.data;
     } catch (error) {
       console.error("Error generating speech:", error);
       toast.error("Error generating speech. Please try again.");
       throw error;
     }
+  }
+
+  // In a production app, you would implement this method to convert audio to text
+  // This is a placeholder that would be replaced with actual API calls
+  async transcribeAudio(audioBlob: Blob): Promise<string> {
+    // In a real implementation, you would:
+    // 1. Send the audio to OpenAI's Whisper API or another STT service
+    // 2. Get back the transcription
+    // 3. Return it
+    
+    console.log("Transcribing audio...");
+    
+    // Simulate a delay for the API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    return "This is a placeholder for what the user said. In a real implementation, this would be transcribed from the audio.";
   }
 
   setVoiceId(voiceId: string) {

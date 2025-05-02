@@ -1,45 +1,77 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Send, PhoneOff, LayoutDashboard } from "lucide-react";
+import { Mic, MicOff, PhoneOff, LayoutDashboard } from "lucide-react";
 import { ChatMessageComponent } from "./ChatMessage";
 import { apiService, ChatMessage } from "@/services/api";
 import { voiceRecorder } from "@/services/voiceRecorder";
 import { AudioVisualizer } from "./AudioVisualizer";
 import { ThemeToggle } from "./ThemeToggle";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Dashboard } from "./Dashboard";
 
-const INITIAL_MESSAGES: ChatMessage[] = [
-  {
-    role: "assistant",
-    content: "Hello! I'm your AI assistant. How can I help you today?",
-    timestamp: Date.now(),
-  },
-];
+interface ChatProps {
+  onEndCall: () => void;
+  onDashboard: () => void;
+}
 
-export function Chat() {
-  const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
+export function Chat({ onEndCall, onDashboard }: ChatProps) {
+  const userData = localStorage.getItem("user_data") ? JSON.parse(localStorage.getItem("user_data")!) : null;
+  const userName = userData?.name || "there";
+  
+  // Initial greeting based on the user name
+  const initialGreeting = `Hello ${userName}! I'm your AI Voice Assistant. How can I help you today?`;
+  
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: "assistant",
+      content: initialGreeting,
+      timestamp: Date.now(),
+    },
+  ]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const userData = localStorage.getItem("user_data");
-  const [userName, setUserName] = useState<string>(userData ? JSON.parse(userData).name : "");
 
+  // Speak initial greeting when component mounts
   useEffect(() => {
-    // Custom greeting if user name exists
-    if (userName) {
-      const customGreeting: ChatMessage = {
-        role: "assistant",
-        content: `Hello ${userName}! Welcome back. How can I help you today?`,
-        timestamp: Date.now(),
-      };
-      setMessages([customGreeting]);
-    }
-  }, [userName]);
+    const speakInitialGreeting = async () => {
+      try {
+        setIsSpeaking(true);
+        const audioData = await apiService.generateSpeech(initialGreeting);
+        
+        // Create audio blob and play it
+        const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        if (audioRef.current) {
+          audioRef.current.src = audioUrl;
+          audioRef.current.play();
+        }
+      } catch (error) {
+        console.error("Error speaking initial greeting:", error);
+        toast.error("Could not play the welcome message. Please check your API keys.");
+      }
+    };
+    
+    // Increment conversation counter
+    const totalConversations = localStorage.getItem("total_conversations") || "0";
+    localStorage.setItem("total_conversations", (parseInt(totalConversations) + 1).toString());
+    
+    // Store this conversation in history
+    const conversationHistory = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+    const newConversation = {
+      id: Date.now(),
+      date: new Date().toISOString(),
+      messages: [messages[0]]
+    };
+    conversationHistory.push(newConversation);
+    localStorage.setItem("conversation_history", JSON.stringify(conversationHistory));
+    
+    // Speak greeting
+    speakInitialGreeting();
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
@@ -60,15 +92,16 @@ export function Chat() {
       audioRef.current.pause();
     }
     
-    // Save conversation history if needed
-    // localStorage.setItem("conversation_history", JSON.stringify(messages));
-    
-    toast.success("Call ended successfully");
-    
-    // Navigate back to welcome screen
-    if (window.confirm("End the current call?")) {
-      window.location.reload();
+    // Save conversation history
+    const conversationHistory = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+    const currentConversation = conversationHistory[conversationHistory.length - 1];
+    if (currentConversation) {
+      currentConversation.messages = messages;
+      localStorage.setItem("conversation_history", JSON.stringify(conversationHistory));
     }
+    
+    // Call the parent component's handler
+    onEndCall();
   };
 
   const handleVoiceToggle = async () => {
@@ -87,16 +120,27 @@ export function Chat() {
   };
 
   const handleVoiceData = async (audioBlob: Blob) => {
-    // In a real implementation, you would use speech-to-text here
-    // For this demo, we'll just use a placeholder message
-    const userMessage: ChatMessage = {
-      role: "user",
-      content: "This is a voice message. In a real implementation, we would convert this to text.",
-      timestamp: Date.now(),
-    };
+    try {
+      setIsProcessing(true);
+      
+      // In a production app, you would send this audio to a speech-to-text API
+      // For now, we'll use a placeholder message
+      const transcription = "This is a transcription of what the user said. In a real implementation, this would come from a speech-to-text service.";
+      
+      const userMessage: ChatMessage = {
+        role: "user",
+        content: transcription,
+        timestamp: Date.now(),
+      };
 
-    setMessages((prev) => [...prev, userMessage]);
-    await processUserMessage(userMessage);
+      setMessages((prev) => [...prev, userMessage]);
+      await processUserMessage(userMessage);
+    } catch (error) {
+      console.error("Error processing voice data:", error);
+      toast.error("Error processing your voice input.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const processUserMessage = async (userMessage: ChatMessage) => {
@@ -117,6 +161,15 @@ export function Chat() {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // Save to conversation history
+      const conversationHistory = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+      const currentConversation = conversationHistory[conversationHistory.length - 1];
+      if (currentConversation) {
+        currentConversation.messages.push(userMessage);
+        currentConversation.messages.push(assistantMessage);
+        localStorage.setItem("conversation_history", JSON.stringify(conversationHistory));
+      }
 
       // Generate and play speech for the assistant's response
       setIsSpeaking(true);
@@ -150,23 +203,21 @@ export function Chat() {
           <div className="w-10 h-10 rounded-full bg-assistant-primary flex items-center justify-center">
             <span className="text-white font-semibold">AI</span>
           </div>
-          <h1 className="text-xl font-semibold">Echo Speak</h1>
+          <h1 className="text-xl font-semibold">AI Voice Assistant</h1>
         </div>
         <div className="flex items-center gap-2">
           <AudioVisualizer isActive={isSpeaking} />
           
           {/* Dashboard Button */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="rounded-full">
-                <LayoutDashboard className="h-5 w-5" />
-                <span className="sr-only">Dashboard</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent>
-              <Dashboard userName={userName} />
-            </SheetContent>
-          </Sheet>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={onDashboard}
+            className="rounded-full"
+          >
+            <LayoutDashboard className="h-5 w-5" />
+            <span className="sr-only">Dashboard</span>
+          </Button>
           
           <ThemeToggle />
           
@@ -193,12 +244,13 @@ export function Chat() {
         </div>
       </div>
 
-      {/* Voice Input Button Only - No Text Input */}
+      {/* Voice Input Button Only */}
       <div className="p-4 border-t">
         <div className="max-w-3xl mx-auto flex justify-center">
           <Button
             size="lg"
             onClick={handleVoiceToggle}
+            disabled={isProcessing || isSpeaking}
             className={`rounded-full w-16 h-16 ${isRecording ? "bg-assistant-primary text-white" : ""}`}
           >
             {isRecording ? (
