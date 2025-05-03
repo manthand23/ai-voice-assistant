@@ -19,16 +19,7 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
   const userName = userData?.name || "there";
   const userEmail = userData?.email || "";
   
-  // Initial greeting based on the user name
-  const initialGreeting = `Hello ${userName}! I'm your AI Voice Assistant. How can I help you today?`;
-  
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "assistant",
-      content: initialGreeting,
-      timestamp: Date.now(),
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -36,7 +27,6 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [conversationId, setConversationId] = useState<number>(Date.now());
   const [hasSpokenInitialGreeting, setHasSpokenInitialGreeting] = useState(false);
-  const [welcomeBackMessage, setWelcomeBackMessage] = useState<string | null>(null);
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
   
   // Function to speak a message
@@ -73,9 +63,12 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
     }
   };
 
-  // Check for previous conversations with this user and prepare welcome back message
+  // Check for previous conversations with this user and prepare welcome message
   useEffect(() => {
     const loadPreviousConversation = async () => {
+      // Create a base greeting
+      let greeting = `Hello ${userName}! I'm your AI Voice Assistant.`;
+      
       const history = JSON.parse(localStorage.getItem("conversation_history") || "[]");
       
       // Find the most recent conversation for this user
@@ -86,16 +79,13 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
           msg.content && 
           msg.content.includes(`Hello ${userName}!`)
         )) {
-          // Construct welcome back message with context from previous conversation
-          let welcomeMessage = `Welcome back, ${userName}! I remember our previous conversation.`;
-          
           // Extract topics from the last few user messages
           const userMessages = conv.messages
             .filter((msg: any) => msg.role === "user")
             .slice(-3); // Get the last 3 user messages
             
           if (userMessages.length > 0) {
-            welcomeMessage += " We were discussing ";
+            // Get topics from previous conversations
             const topics = userMessages.map((msg: any) => {
               const content = msg.content.toLowerCase();
               if (content.includes("weather")) return "the weather forecast";
@@ -109,67 +99,48 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
             
             // Get unique topics
             const uniqueTopics = Array.from(new Set(topics));
-            welcomeMessage += uniqueTopics.join(" and ") + ".";
+            if (uniqueTopics.length > 0) {
+              greeting += ` I remember our previous conversation about ${uniqueTopics.join(" and ")}. Would you like to continue that conversation?`;
+            }
           }
-          
-          welcomeMessage += " How can I help you today?";
-          
-          // Set welcome back message
-          setWelcomeBackMessage(welcomeMessage);
-          
-          // Add welcome back message
-          const welcomeBackMsg: ChatMessage = {
-            role: "assistant",
-            content: welcomeMessage,
-            timestamp: Date.now(),
-          };
-          
-          setMessages(prev => [...prev, welcomeBackMsg]);
-          return;
+          break;
         }
       }
-    };
-    
-    // Only load previous conversation if this isn't the first message
-    if (messages.length === 1) {
-      loadPreviousConversation();
-    }
-  }, [userName]);
-
-  // Speak initial greeting and queue the welcome back message when component mounts
-  useEffect(() => {
-    const initializeConversation = async () => {
-      if (!hasSpokenInitialGreeting) {
-        setHasSpokenInitialGreeting(true);
-        
-        // Add initial greeting to message queue
-        setMessageQueue(prev => [...prev, initialGreeting]);
-        
-        // Increment conversation counter
-        const totalConversations = localStorage.getItem("total_conversations") || "0";
-        localStorage.setItem("total_conversations", (parseInt(totalConversations) + 1).toString());
-        
-        // Store this conversation in history
-        const conversationHistory = JSON.parse(localStorage.getItem("conversation_history") || "[]");
-        const newConversation = {
-          id: conversationId,
-          date: new Date().toISOString(),
-          messages: [messages[0]]
-        };
-        conversationHistory.push(newConversation);
-        localStorage.setItem("conversation_history", JSON.stringify(conversationHistory));
+      
+      // If no previous conversation was found or no topics extracted, use the basic greeting
+      if (!greeting.includes("remember")) {
+        greeting += " How can I help you today?";
       }
+      
+      // Set initial message
+      const initialMessage: ChatMessage = {
+        role: "assistant",
+        content: greeting,
+        timestamp: Date.now(),
+      };
+      
+      setMessages([initialMessage]);
+      
+      // Add greeting to message queue for speech
+      setMessageQueue([greeting]);
+      
+      // Store this conversation in history
+      const conversationHistory = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+      const newConversation = {
+        id: conversationId,
+        date: new Date().toISOString(),
+        messages: [initialMessage]
+      };
+      conversationHistory.push(newConversation);
+      localStorage.setItem("conversation_history", JSON.stringify(conversationHistory));
+      
+      // Increment conversation counter
+      const totalConversations = localStorage.getItem("total_conversations") || "0";
+      localStorage.setItem("total_conversations", (parseInt(totalConversations) + 1).toString());
     };
     
-    initializeConversation();
-  }, []);
-
-  // Add welcome back message to queue when available
-  useEffect(() => {
-    if (welcomeBackMessage && hasSpokenInitialGreeting) {
-      setMessageQueue(prev => [...prev, welcomeBackMessage]);
-    }
-  }, [welcomeBackMessage, hasSpokenInitialGreeting]);
+    loadPreviousConversation();
+  }, [userName, conversationId]);
 
   // Process message queue
   useEffect(() => {
