@@ -1,4 +1,3 @@
-
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -61,11 +60,21 @@ class ApiService {
         }
       );
 
-      return response.data.choices[0].message.content;
-    } catch (error) {
+      // Debug the response structure
+      console.log("OpenAI API response:", JSON.stringify(response.data, null, 2));
+      
+      if (response.data && response.data.choices && response.data.choices.length > 0) {
+        return response.data.choices[0].message.content;
+      } else {
+        console.error("Unexpected API response structure:", response.data);
+        return "I apologize, but I received an unexpected response format. Please try again.";
+      }
+    } catch (error: any) {
       console.error("Error generating text response:", error);
-      toast.error("Error generating response. Please try again.");
-      return "I'm sorry, I'm having trouble responding right now. Please try again later.";
+      const errorMessage = error.response?.data?.error?.message || error.message || "Unknown error";
+      console.error("Error details:", errorMessage);
+      toast.error(`Error: ${errorMessage}`);
+      return "I'm sorry, I couldn't process your request. Please try again later.";
     }
   }
 
