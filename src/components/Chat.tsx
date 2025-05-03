@@ -35,10 +35,11 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [conversationId, setConversationId] = useState<number>(Date.now());
+  const [hasWelcomeBackBeenSpoken, setHasWelcomeBackBeenSpoken] = useState(false);
 
   // Check for previous conversations with this user
   useEffect(() => {
-    const loadPreviousConversation = () => {
+    const loadPreviousConversation = async () => {
       const history = JSON.parse(localStorage.getItem("conversation_history") || "[]");
       
       // Find the most recent conversation for this user
@@ -49,15 +50,44 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
           msg.content && 
           msg.content.includes(`Hello ${userName}!`)
         )) {
-          // Found a previous conversation with this user
-          setMessages(prev => [
-            ...prev,
-            {
-              role: "assistant",
-              content: `Welcome back, ${userName}! I remember our previous conversation. How can I help you today?`,
-              timestamp: Date.now(),
-            }
-          ]);
+          // Construct welcome back message with context from previous conversation
+          let welcomeBackMessage = `Welcome back, ${userName}! I remember our previous conversation.`;
+          
+          // Extract topics from the last few user messages
+          const userMessages = conv.messages
+            .filter((msg: any) => msg.role === "user")
+            .slice(-3); // Get the last 3 user messages
+            
+          if (userMessages.length > 0) {
+            welcomeBackMessage += " We were discussing ";
+            const topics = userMessages.map((msg: any) => {
+              const content = msg.content.toLowerCase();
+              if (content.includes("weather")) return "the weather forecast";
+              if (content.includes("calendar")) return "your calendar";
+              if (content.includes("email") || content.includes("send")) return "sending information to your email";
+              if (content.includes("renewable energy")) return "renewable energy developments";
+              if (content.includes("time management")) return "time management techniques";
+              if (content.includes("meeting") || content.includes("book")) return "booking a meeting";
+              return "various topics";
+            });
+            
+            // Get unique topics
+            const uniqueTopics = Array.from(new Set(topics));
+            welcomeBackMessage += uniqueTopics.join(" and ") + ".";
+          }
+          
+          welcomeBackMessage += " How can I help you today?";
+          
+          // Add welcome back message
+          const welcomeBackMsg: ChatMessage = {
+            role: "assistant",
+            content: welcomeBackMessage,
+            timestamp: Date.now(),
+          };
+          
+          setMessages(prev => [...prev, welcomeBackMsg]);
+          
+          // We'll speak this message in the next useEffect
           return;
         }
       }
@@ -107,6 +137,39 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
     // Speak greeting
     speakInitialGreeting();
   }, []);
+
+  // Speak welcome back message if it exists
+  useEffect(() => {
+    const speakWelcomeBack = async () => {
+      if (messages.length > 1 && !hasWelcomeBackBeenSpoken) {
+        const welcomeBackMessage = messages[messages.length - 1];
+        if (
+          welcomeBackMessage.role === "assistant" && 
+          welcomeBackMessage.content.includes(`Welcome back, ${userName}!`)
+        ) {
+          try {
+            setIsSpeaking(true);
+            const audioData = await apiService.generateSpeech(welcomeBackMessage.content);
+            
+            // Create audio blob and play it
+            const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            if (audioRef.current) {
+              audioRef.current.src = audioUrl;
+              audioRef.current.play();
+              setHasWelcomeBackBeenSpoken(true);
+            }
+          } catch (error) {
+            console.error("Error speaking welcome back message:", error);
+            toast.error("Could not play the welcome back message. Please check your API keys.");
+          }
+        }
+      }
+    };
+    
+    speakWelcomeBack();
+  }, [messages, userName, hasWelcomeBackBeenSpoken]);
 
   useEffect(() => {
     scrollToBottom();

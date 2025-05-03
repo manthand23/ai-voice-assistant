@@ -1,3 +1,4 @@
+
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -45,6 +46,7 @@ class ApiService {
     }
 
     try {
+      // Try to get a response from OpenAI
       const response = await axios.post(
         `${OPENAI_API_URL}/chat/completions`,
         {
@@ -73,9 +75,51 @@ class ApiService {
       console.error("Error generating text response:", error);
       const errorMessage = error.response?.data?.error?.message || error.message || "Unknown error";
       console.error("Error details:", errorMessage);
-      toast.error(`Error: ${errorMessage}`);
-      return "I'm sorry, I couldn't process your request. Please try again later.";
+      
+      // Check for quota exceeded error and provide a fallback response
+      if (errorMessage.includes("exceeded your current quota") || error.response?.status === 429) {
+        toast.error("API quota exceeded. Using fallback responses.");
+        
+        // Generate a fallback response based on the last user message
+        const lastUserMessage = messages.filter(msg => msg.role === "user").pop();
+        if (lastUserMessage) {
+          return this.generateFallbackResponse(lastUserMessage.content);
+        }
+      } else {
+        toast.error(`Error: ${errorMessage}`);
+      }
+      
+      return "I'm sorry, I couldn't process your request. I'm currently operating in offline mode with limited functionality.";
     }
+  }
+
+  // Fallback response generator when API calls fail
+  private generateFallbackResponse(userMessage: string): string {
+    const userMessageLower = userMessage.toLowerCase();
+    
+    // Handle common queries with pre-defined responses
+    if (userMessageLower.includes("weather")) {
+      return "I'm sorry, I can't access real-time weather data right now. If you'd like weather information, please check a weather app or website for the most up-to-date forecast.";
+    }
+    
+    if (userMessageLower.includes("email") || userMessageLower.includes("send")) {
+      return "I understand you want me to email something. I would typically send this to your email address, but I'm currently in offline mode. Please try again later when our systems are fully operational.";
+    }
+    
+    if (userMessageLower.includes("calendar") || userMessageLower.includes("schedule") || userMessageLower.includes("appointment")) {
+      return "I see you want help with your calendar or scheduling. Normally, I could assist with that, but I'm currently operating with limited functionality. Please try again later or manage your calendar directly.";
+    }
+    
+    if (userMessageLower.includes("renewable energy")) {
+      return "Renewable energy has seen significant growth recently, with solar and wind capacity expanding globally. Many countries are setting ambitious clean energy targets, and there's increasing investment in grid-scale storage solutions. For detailed information, I'd be happy to email you a comprehensive report when our systems are back online.";
+    }
+    
+    if (userMessageLower.includes("time management")) {
+      return "For better time management, try techniques like time blocking, the Pomodoro method with focused work sessions, and prioritizing tasks using the Eisenhower matrix. Setting clear boundaries and reducing multitasking can also help improve your productivity.";
+    }
+    
+    // Default response if no specific pattern is matched
+    return "I understand your query, but I'm currently operating in offline mode with limited functionality. Please try again later when our systems are fully operational.";
   }
 
   async generateSpeech(text: string): Promise<ArrayBuffer> {
