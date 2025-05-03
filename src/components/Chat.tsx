@@ -35,9 +35,45 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [conversationId, setConversationId] = useState<number>(Date.now());
-  const [hasWelcomeBackBeenSpoken, setHasWelcomeBackBeenSpoken] = useState(false);
+  const [hasSpokenInitialGreeting, setHasSpokenInitialGreeting] = useState(false);
+  const [welcomeBackMessage, setWelcomeBackMessage] = useState<string | null>(null);
+  const [messageQueue, setMessageQueue] = useState<string[]>([]);
+  
+  // Function to speak a message
+  const speakMessage = async (message: string) => {
+    try {
+      setIsSpeaking(true);
+      const audioData = await apiService.generateSpeech(message);
+      
+      // Create audio blob and play it
+      const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      if (audioRef.current) {
+        audioRef.current.src = audioUrl;
+        audioRef.current.play();
+      }
+      return true;
+    } catch (error) {
+      console.error("Error speaking message:", error);
+      toast.error("Could not play the audio message. Please check your API keys.");
+      setIsSpeaking(false);
+      return false;
+    }
+  };
 
-  // Check for previous conversations with this user
+  // Process the message queue
+  const processMessageQueue = async () => {
+    if (messageQueue.length > 0 && !isSpeaking) {
+      const nextMessage = messageQueue[0];
+      const newQueue = messageQueue.slice(1);
+      setMessageQueue(newQueue);
+      
+      await speakMessage(nextMessage);
+    }
+  };
+
+  // Check for previous conversations with this user and prepare welcome back message
   useEffect(() => {
     const loadPreviousConversation = async () => {
       const history = JSON.parse(localStorage.getItem("conversation_history") || "[]");
@@ -51,7 +87,7 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
           msg.content.includes(`Hello ${userName}!`)
         )) {
           // Construct welcome back message with context from previous conversation
-          let welcomeBackMessage = `Welcome back, ${userName}! I remember our previous conversation.`;
+          let welcomeMessage = `Welcome back, ${userName}! I remember our previous conversation.`;
           
           // Extract topics from the last few user messages
           const userMessages = conv.messages
@@ -59,7 +95,7 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
             .slice(-3); // Get the last 3 user messages
             
           if (userMessages.length > 0) {
-            welcomeBackMessage += " We were discussing ";
+            welcomeMessage += " We were discussing ";
             const topics = userMessages.map((msg: any) => {
               const content = msg.content.toLowerCase();
               if (content.includes("weather")) return "the weather forecast";
@@ -73,21 +109,22 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
             
             // Get unique topics
             const uniqueTopics = Array.from(new Set(topics));
-            welcomeBackMessage += uniqueTopics.join(" and ") + ".";
+            welcomeMessage += uniqueTopics.join(" and ") + ".";
           }
           
-          welcomeBackMessage += " How can I help you today?";
+          welcomeMessage += " How can I help you today?";
+          
+          // Set welcome back message
+          setWelcomeBackMessage(welcomeMessage);
           
           // Add welcome back message
           const welcomeBackMsg: ChatMessage = {
             role: "assistant",
-            content: welcomeBackMessage,
+            content: welcomeMessage,
             timestamp: Date.now(),
           };
           
           setMessages(prev => [...prev, welcomeBackMsg]);
-          
-          // We'll speak this message in the next useEffect
           return;
         }
       }
@@ -99,78 +136,47 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
     }
   }, [userName]);
 
-  // Speak initial greeting when component mounts
+  // Speak initial greeting and queue the welcome back message when component mounts
   useEffect(() => {
-    const speakInitialGreeting = async () => {
-      try {
-        setIsSpeaking(true);
-        const audioData = await apiService.generateSpeech(initialGreeting);
+    const initializeConversation = async () => {
+      if (!hasSpokenInitialGreeting) {
+        setHasSpokenInitialGreeting(true);
         
-        // Create audio blob and play it
-        const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
-        const audioUrl = URL.createObjectURL(audioBlob);
+        // Add initial greeting to message queue
+        setMessageQueue(prev => [...prev, initialGreeting]);
         
-        if (audioRef.current) {
-          audioRef.current.src = audioUrl;
-          audioRef.current.play();
-        }
-      } catch (error) {
-        console.error("Error speaking initial greeting:", error);
-        toast.error("Could not play the welcome message. Please check your API keys.");
+        // Increment conversation counter
+        const totalConversations = localStorage.getItem("total_conversations") || "0";
+        localStorage.setItem("total_conversations", (parseInt(totalConversations) + 1).toString());
+        
+        // Store this conversation in history
+        const conversationHistory = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+        const newConversation = {
+          id: conversationId,
+          date: new Date().toISOString(),
+          messages: [messages[0]]
+        };
+        conversationHistory.push(newConversation);
+        localStorage.setItem("conversation_history", JSON.stringify(conversationHistory));
       }
     };
     
-    // Increment conversation counter
-    const totalConversations = localStorage.getItem("total_conversations") || "0";
-    localStorage.setItem("total_conversations", (parseInt(totalConversations) + 1).toString());
-    
-    // Store this conversation in history
-    const conversationHistory = JSON.parse(localStorage.getItem("conversation_history") || "[]");
-    const newConversation = {
-      id: conversationId,
-      date: new Date().toISOString(),
-      messages: [messages[0]]
-    };
-    conversationHistory.push(newConversation);
-    localStorage.setItem("conversation_history", JSON.stringify(conversationHistory));
-    
-    // Speak greeting
-    speakInitialGreeting();
+    initializeConversation();
   }, []);
 
-  // Speak welcome back message if it exists
+  // Add welcome back message to queue when available
   useEffect(() => {
-    const speakWelcomeBack = async () => {
-      if (messages.length > 1 && !hasWelcomeBackBeenSpoken) {
-        const welcomeBackMessage = messages[messages.length - 1];
-        if (
-          welcomeBackMessage.role === "assistant" && 
-          welcomeBackMessage.content.includes(`Welcome back, ${userName}!`)
-        ) {
-          try {
-            setIsSpeaking(true);
-            const audioData = await apiService.generateSpeech(welcomeBackMessage.content);
-            
-            // Create audio blob and play it
-            const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            
-            if (audioRef.current) {
-              audioRef.current.src = audioUrl;
-              audioRef.current.play();
-              setHasWelcomeBackBeenSpoken(true);
-            }
-          } catch (error) {
-            console.error("Error speaking welcome back message:", error);
-            toast.error("Could not play the welcome back message. Please check your API keys.");
-          }
-        }
-      }
-    };
-    
-    speakWelcomeBack();
-  }, [messages, userName, hasWelcomeBackBeenSpoken]);
+    if (welcomeBackMessage && hasSpokenInitialGreeting) {
+      setMessageQueue(prev => [...prev, welcomeBackMessage]);
+    }
+  }, [welcomeBackMessage, hasSpokenInitialGreeting]);
 
+  // Process message queue
+  useEffect(() => {
+    processMessageQueue();
+  }, [messageQueue, isSpeaking]);
+
+  // Scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -197,6 +203,9 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
       currentConversation.messages = messages;
       localStorage.setItem("conversation_history", JSON.stringify(conversationHistory));
     }
+    
+    // Clear message queue
+    setMessageQueue([]);
     
     // Call the parent component's handler
     onEndCall();
@@ -280,18 +289,8 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
         localStorage.setItem("conversation_history", JSON.stringify(conversationHistory));
       }
 
-      // Generate and play speech for the assistant's response
-      setIsSpeaking(true);
-      const audioData = await apiService.generateSpeech(assistantResponse);
-      
-      // Create audio blob and play it
-      const audioBlob = new Blob([audioData], { type: "audio/mpeg" });
-      const audioUrl = URL.createObjectURL(audioBlob);
-      
-      if (audioRef.current) {
-        audioRef.current.src = audioUrl;
-        audioRef.current.play();
-      }
+      // Add assistant response to message queue
+      setMessageQueue(prev => [...prev, assistantResponse]);
     } catch (error) {
       console.error("Error processing message:", error);
       toast.error("An error occurred while processing your message.");

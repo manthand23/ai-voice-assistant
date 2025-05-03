@@ -15,6 +15,7 @@ class ApiService {
   private elevenLabsApiKey: string | null = "sk_e2103037e1030bf853e28411fe89320cdfc979d42c50dcad";
   private openAiApiKey: string | null = "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";
   private voiceId: string = "EXAVITQu4vr4xnSDxMaL"; // Sarah voice ID
+  private isInFallbackMode: boolean = false;
 
   constructor() {
     this.loadApiKeys();
@@ -45,6 +46,15 @@ class ApiService {
       throw new Error("OpenAI API key is not set");
     }
 
+    // If we're already in fallback mode, skip the API call
+    if (this.isInFallbackMode) {
+      const lastUserMessage = messages.filter(msg => msg.role === "user").pop();
+      if (lastUserMessage) {
+        return this.generateFallbackResponse(lastUserMessage.content);
+      }
+      return "I'm in offline mode. How can I assist you today?";
+    }
+
     try {
       // Try to get a response from OpenAI
       const response = await axios.post(
@@ -61,9 +71,6 @@ class ApiService {
           },
         }
       );
-
-      // Debug the response structure
-      console.log("OpenAI API response:", JSON.stringify(response.data, null, 2));
       
       if (response.data && response.data.choices && response.data.choices.length > 0) {
         return response.data.choices[0].message.content;
@@ -78,6 +85,8 @@ class ApiService {
       
       // Check for quota exceeded error and provide a fallback response
       if (errorMessage.includes("exceeded your current quota") || error.response?.status === 429) {
+        // Switch to fallback mode
+        this.isInFallbackMode = true;
         toast.error("API quota exceeded. Using fallback responses.");
         
         // Generate a fallback response based on the last user message
@@ -116,6 +125,14 @@ class ApiService {
     
     if (userMessageLower.includes("time management")) {
       return "For better time management, try techniques like time blocking, the Pomodoro method with focused work sessions, and prioritizing tasks using the Eisenhower matrix. Setting clear boundaries and reducing multitasking can also help improve your productivity.";
+    }
+    
+    if (userMessageLower.includes("book") || userMessageLower.includes("meeting")) {
+      return "I understand you want to book a meeting. In normal operation, I could help schedule this for you. For now, I recommend using your preferred calendar app to set this up manually.";
+    }
+    
+    if (userMessageLower.includes("marketing")) {
+      return "Regarding marketing strategies, some effective approaches include content marketing through blogs and social media, email marketing campaigns with personalized messaging, search engine optimization to increase organic traffic, and leveraging data analytics to understand customer behavior. When our systems are fully operational, I can email you a detailed marketing plan.";
     }
     
     // Default response if no specific pattern is matched
@@ -185,6 +202,11 @@ class ApiService {
 
   setVoiceId(voiceId: string) {
     this.voiceId = voiceId;
+  }
+  
+  // Reset the fallback mode (for testing purposes)
+  resetFallbackMode() {
+    this.isInFallbackMode = false;
   }
 }
 
