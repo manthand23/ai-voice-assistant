@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
@@ -15,7 +14,7 @@ interface WelcomeScreenProps {
 export function WelcomeScreen({ onComplete, onDashboard }: WelcomeScreenProps) {
   // Hardcoded API keys - NOTE: In a real production app, these would be environment variables
   const elevenLabsApiKey = "sk_e2103037e1030bf853e28411fe89320cdfc979d42c50dcad";
-  const openAiApiKey = "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";
+  const openAiApiKey = "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";
   
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
