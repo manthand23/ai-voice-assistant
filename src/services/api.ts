@@ -1,4 +1,3 @@
-
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -12,8 +11,8 @@ export interface ChatMessage {
 }
 
 class ApiService {
-  private elevenLabsApiKey: string | null = "sk_e2103037e1030bf853e28411fe89320cdfc979d42c50dcad";
-  private openAiApiKey: string | null = "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";
+  private elevenLabsApiKey: string | null = "sk_c94b29279b2e053b449b5c64943363c510c642b709fc79ff";
+  private openAiApiKey: string | null = "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";
   private voiceId: string = "EXAVITQu4vr4xnSDxMaL"; // Sarah voice ID
 
   constructor() {
@@ -111,7 +110,6 @@ class ApiService {
     }
   }
 
-  // Implement an actual transcription function using OpenAI's Whisper API
   async transcribeAudio(audioBlob: Blob): Promise<string> {
     try {
       // In a real implementation, you would send this to OpenAI Whisper API
