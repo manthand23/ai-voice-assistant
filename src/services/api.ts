@@ -1,3 +1,4 @@
+
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -12,7 +13,7 @@ export interface ChatMessage {
 
 class ApiService {
   private elevenLabsApiKey: string | null = "sk_c94b29279b2e053b449b5c64943363c510c642b709fc79ff";
-  private openAiApiKey: string | null = "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";
+  private openAiApiKey: string | null = "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";
   private voiceId: string = "EXAVITQu4vr4xnSDxMaL"; // Sarah voice ID
 
   constructor() {
@@ -111,28 +112,45 @@ class ApiService {
   }
 
   async transcribeAudio(audioBlob: Blob): Promise<string> {
+    if (!this.openAiApiKey) {
+      throw new Error("OpenAI API key is not set");
+    }
+
     try {
-      // In a real implementation, you would send this to OpenAI Whisper API
-      console.log("Transcribing audio...");
+      // Convert audio blob to File object
+      const file = new File([audioBlob], "recording.webm", { type: "audio/webm" });
       
-      // Here we'll simulate a transcription with a delay
-      const transcriptions = [
-        "Can you tell me more about AI voice assistants?",
-        "I need help with my calendar for next week.",
-        "What's the weather forecast for tomorrow?",
-        "Can you send me information about new marketing strategies to my email?",
-        "I'd like to book a meeting for tomorrow afternoon.",
-        "Tell me about the latest developments in renewable energy and also how to improve my time management skills.",
-      ];
+      // Create form data
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("model", "whisper-1");
+      formData.append("language", "en"); // You can make this configurable
       
-      // Wait for a short time to simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Return a random transcription
-      return transcriptions[Math.floor(Math.random() * transcriptions.length)];
-    } catch (error) {
+      // Send to OpenAI Whisper API
+      const response = await axios.post(
+        `${OPENAI_API_URL}/audio/transcriptions`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${this.openAiApiKey}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (response.data && response.data.text) {
+        console.log("Transcription result:", response.data.text);
+        return response.data.text;
+      } else {
+        console.error("Unexpected transcription response:", response);
+        toast.error("Failed to transcribe audio");
+        return "Could not transcribe audio. Please try again.";
+      }
+    } catch (error: any) {
       console.error("Error transcribing audio:", error);
-      toast.error("Error transcribing audio. Please try again.");
+      const errorMessage = error.response?.data?.error?.message || error.message || "Unknown error";
+      console.error("Transcription error details:", errorMessage);
+      toast.error(`Transcription error: ${errorMessage}`);
       return "Could not transcribe audio. Please try again.";
     }
   }

@@ -13,8 +13,19 @@ class VoiceRecorder {
       this.audioChunks = [];
       this.onDataAvailable = onDataCallback;
 
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      this.mediaRecorder = new MediaRecorder(this.stream);
+      // Request audio with specific constraints for better compatibility with Whisper
+      this.stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 16000,
+        } 
+      });
+      
+      // Using audio/webm MIME type for better compatibility
+      this.mediaRecorder = new MediaRecorder(this.stream, {
+        mimeType: 'audio/webm',
+      });
 
       this.mediaRecorder.addEventListener("dataavailable", (event) => {
         if (event.data.size > 0) {
@@ -23,6 +34,7 @@ class VoiceRecorder {
       });
 
       this.mediaRecorder.addEventListener("stop", () => {
+        // Combine audio chunks into a single blob
         const audioBlob = new Blob(this.audioChunks, { type: "audio/webm" });
         if (this.onDataAvailable) {
           this.onDataAvailable(audioBlob);
