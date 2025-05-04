@@ -46,11 +46,13 @@ class ApiService {
     }
 
     try {
+      console.log("Using OpenAI API key:", this.openAiApiKey.substring(0, 10) + "...");
+      
       // Get a response from OpenAI
       const response = await axios.post(
         `${OPENAI_API_URL}/chat/completions`,
         {
-          model: "gpt-4o-mini",
+          model: "gpt-4o-mini", // Using the recommended model
           messages: messages.map(({ role, content }) => ({ role, content })),
           max_tokens: 1000,
         },
@@ -120,6 +122,9 @@ class ApiService {
       // Convert audio blob to File object
       const file = new File([audioBlob], "recording.webm", { type: "audio/webm" });
       
+      console.log("Using OpenAI API key for transcription:", this.openAiApiKey.substring(0, 10) + "...");
+      console.log("Audio file size:", file.size, "bytes");
+      
       // Create form data
       const formData = new FormData();
       formData.append("file", file);
@@ -151,6 +156,12 @@ class ApiService {
       const errorMessage = error.response?.data?.error?.message || error.message || "Unknown error";
       console.error("Transcription error details:", errorMessage);
       toast.error(`Transcription error: ${errorMessage}`);
+      
+      // If we get a quota error, suggest checking the billing dashboard
+      if (errorMessage.includes("quota") || errorMessage.includes("billing")) {
+        toast.error("OpenAI quota exceeded. Please check your OpenAI billing dashboard to ensure your payment method is valid and you have sufficient credits.");
+      }
+      
       return "Could not transcribe audio. Please try again.";
     }
   }
