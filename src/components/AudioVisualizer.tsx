@@ -1,4 +1,3 @@
-
 import { cn } from "@/lib/utils";
 
 export function AudioVisualizer({ isActive = false }: { isActive?: boolean }) {
