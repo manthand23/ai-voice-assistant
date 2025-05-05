@@ -13,7 +13,7 @@ export interface ChatMessage {
 
 class ApiService {
   private elevenLabsApiKey: string | null = "sk_c94b29279b2e053b449b5c64943363c510c642b709fc79ff";
-  private openAiApiKey: string | null = "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";
+  private openAiApiKey: string | null = "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";
   private voiceId: string = "EXAVITQu4vr4xnSDxMaL"; // Sarah voice ID
 
   constructor() {
