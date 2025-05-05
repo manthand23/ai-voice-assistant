@@ -12,7 +12,7 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ onComplete, onDashboard }: WelcomeScreenProps) {
-  // Hardcoded API keys - NOTE: In a real production app, these would be environment variables
+  // Hardcoded API keys 
   const elevenLabsApiKey = "sk_e2103037e1030bf853e28411fe89320cdfc979d42c50dcad";
   const openAiApiKey = "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";
   
