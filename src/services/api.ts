@@ -15,6 +15,8 @@ class ApiService {
   private elevenLabsApiKey: string | null = "sk_c94b29279b2e053b449b5c64943363c510c642b709fc79ff";
   private openAiApiKey: string | null = "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";
   private voiceId: string = "EXAVITQu4vr4xnSDxMaL"; // Sarah voice ID
+  private transcriptionAttempts: number = 0;
+  private maxTranscriptionAttempts: number = 3;
 
   constructor() {
     this.loadApiKeys();
@@ -119,6 +121,12 @@ class ApiService {
     }
 
     try {
+      // Check if audio is too short (likely silence)
+      if (audioBlob.size < 5000) { // If less than 5KB
+        toast.warning("Recording too short. Please speak for longer.");
+        return "Could not transcribe audio. Please try again.";
+      }
+
       // Convert audio blob to File object with proper format
       const audioType = audioBlob.type || "audio/webm";
       const fileExtension = audioType.includes('wav') ? 'wav' : 'webm';
@@ -148,11 +156,13 @@ class ApiService {
             Authorization: `Bearer ${this.openAiApiKey}`,
             "Content-Type": "multipart/form-data",
           },
+          timeout: 30000, // 30 second timeout
         }
       );
 
       if (response.data && response.data.text) {
         console.log("Transcription successful:", response.data.text);
+        this.transcriptionAttempts = 0; // Reset attempts on success
         return response.data.text;
       } else {
         console.error("Unexpected transcription response:", response);
@@ -163,23 +173,36 @@ class ApiService {
       console.error("Error transcribing audio:", error);
       const errorMessage = error.response?.data?.error?.message || error.message || "Unknown error";
       console.error("Transcription error details:", errorMessage);
-      toast.error(`Transcription error: ${errorMessage}`);
+      
+      // Increase attempt counter
+      this.transcriptionAttempts++;
       
       // Provide more helpful error messages based on common Whisper API issues
       if (errorMessage.includes("quota") || errorMessage.includes("billing")) {
         toast.error("OpenAI quota exceeded. Please check your OpenAI billing dashboard.");
+        return "Sorry, there's an issue with my transcription service. Let me try a different approach.";
       } else if (errorMessage.includes("file too large")) {
         toast.error("Audio file is too large. Please record a shorter message.");
-      } else if (errorMessage.includes("could not recognize speech")) {
-        toast.error("No speech detected. Please speak clearly and try again.");
+        return "Your message was too long. Please try a shorter message.";
+      } else if (errorMessage.includes("could not recognize speech") || !errorMessage) {
+        toast.error("No clear speech detected. Please speak more clearly and try again.");
+        return "I couldn't hear you clearly. Please try again in a quiet environment.";
+      } else if (this.transcriptionAttempts >= this.maxTranscriptionAttempts) {
+        toast.error("Multiple transcription attempts failed. Try typing instead.");
+        return "I'm having trouble understanding your speech. You might want to type your message instead.";
       }
       
+      toast.error(`Transcription error: ${errorMessage}`);
       return "Could not transcribe audio. Please try again.";
     }
   }
 
   setVoiceId(voiceId: string) {
     this.voiceId = voiceId;
+  }
+  
+  resetTranscriptionAttempts() {
+    this.transcriptionAttempts = 0;
   }
 }
 
