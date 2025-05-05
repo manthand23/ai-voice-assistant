@@ -48,7 +48,7 @@ export function Dashboard({ userName, onBackToChat }: DashboardProps) {
     const history = JSON.parse(localStorage.getItem("conversation_history") || "[]");
     setConversationHistory(history);
 
-    // Generate common queries (this would normally be more sophisticated)
+    // Generate common queries
     const queries = new Map<string, number>();
     
     history.forEach((conv: ConversationHistoryItem) => {
