@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, PhoneOff } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Loader2 } from "lucide-react";
 import { ChatMessageComponent } from "./ChatMessage";
 import { apiService, ChatMessage } from "@/services/api";
 import { voiceRecorder } from "@/services/voiceRecorder";
@@ -23,11 +23,14 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [conversationId, setConversationId] = useState<number>(Date.now());
   const [hasSpokenInitialGreeting, setHasSpokenInitialGreeting] = useState(false);
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingTimerRef = useRef<number | null>(null);
   
   // Function to speak a message
   const speakMessage = async (message: string) => {
@@ -151,6 +154,25 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  
+  // Recording duration timer
+  useEffect(() => {
+    if (isRecording) {
+      setRecordingDuration(0);
+      recordingTimerRef.current = window.setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } else if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    };
+  }, [isRecording]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -186,11 +208,15 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
     if (isRecording) {
       setIsRecording(false);
       voiceRecorder.stopRecording();
+      toast.info("Processing your message...");
+      setIsTranscribing(true);
     } else {
+      // Show tips for better recording
+      toast.info("Speak clearly and at a moderate pace for best results. Tap to stop.");
+      
       const success = await voiceRecorder.startRecording(handleVoiceData);
       if (success) {
         setIsRecording(true);
-        toast.info("Listening... Tap to stop.");
       } else {
         toast.error("Could not access microphone. Check permissions.");
       }
@@ -199,11 +225,17 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
 
   const handleVoiceData = async (audioBlob: Blob) => {
     try {
-      setIsProcessing(true);
+      setIsTranscribing(true);
       
-      // In a production app, you would send this audio to a speech-to-text API
-      // For now, we'll use a placeholder message
+      // Transcribe audio using OpenAI Whisper
       const transcription = await apiService.transcribeAudio(audioBlob);
+      
+      setIsTranscribing(false);
+      
+      if (transcription === "Could not transcribe audio. Please try again.") {
+        toast.error("Could not understand audio. Please try again.");
+        return;
+      }
       
       const userMessage: ChatMessage = {
         role: "user",
@@ -215,8 +247,9 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
       await processUserMessage(userMessage);
     } catch (error) {
       console.error("Error processing voice data:", error);
-      toast.error("Error processing your voice input.");
+      toast.error("Error processing your voice input. Please try again.");
     } finally {
+      setIsTranscribing(false);
       setIsProcessing(false);
     }
   };
@@ -273,6 +306,12 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
   const handleAudioEnded = () => {
     setIsSpeaking(false);
   };
+  
+  const formatRecordingTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   return (
     <div className="flex flex-col h-screen max-h-screen">
@@ -285,7 +324,7 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
           <h1 className="text-xl font-semibold">AI Voice Assistant</h1>
         </div>
         <div className="flex items-center gap-2">
-          <AudioVisualizer isActive={isSpeaking} />
+          <AudioVisualizer isActive={isSpeaking || isRecording} />
           <ThemeToggle />
           
           {/* End Call Button */}
@@ -307,25 +346,60 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
           {messages.map((message, index) => (
             <ChatMessageComponent key={index} message={message} />
           ))}
+          
+          {/* Processing indicator */}
+          {(isProcessing || isTranscribing) && (
+            <div className="flex w-full mb-4 justify-start">
+              <div className="max-w-[80%] rounded-2xl px-4 py-3 bg-secondary dark:bg-muted rounded-tl-none">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <p className="text-sm">
+                    {isTranscribing ? "Transcribing your message..." : "Generating response..."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Voice Input Button Only */}
+      {/* Voice Input Button Area */}
       <div className="p-4 border-t">
-        <div className="max-w-3xl mx-auto flex justify-center">
+        <div className="max-w-3xl mx-auto flex flex-col items-center">
+          {isRecording && (
+            <div className="mb-2 text-sm">
+              <span className="animate-pulse text-red-500">●</span> Recording {formatRecordingTime(recordingDuration)}
+            </div>
+          )}
+          
           <Button
             size="lg"
             onClick={handleVoiceToggle}
-            disabled={isProcessing || isSpeaking}
-            className={`rounded-full w-16 h-16 ${isRecording ? "bg-assistant-primary text-white" : ""}`}
+            disabled={isProcessing || isSpeaking || isTranscribing}
+            className={`rounded-full w-16 h-16 ${
+              isRecording 
+                ? "bg-red-500 text-white hover:bg-red-600" 
+                : isProcessing || isTranscribing
+                ? "bg-gray-400 cursor-not-allowed"
+                : ""
+            }`}
           >
             {isRecording ? (
               <MicOff className="h-6 w-6" />
+            ) : isProcessing || isTranscribing ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
             ) : (
               <Mic className="h-6 w-6" />
             )}
           </Button>
+          
+          {!isRecording && !isProcessing && !isTranscribing && !isSpeaking && (
+            <div className="mt-2 text-sm text-gray-500">
+              Tap to start speaking
+            </div>
+          )}
         </div>
       </div>
 

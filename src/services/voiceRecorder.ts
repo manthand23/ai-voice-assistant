@@ -13,18 +13,26 @@ class VoiceRecorder {
       this.audioChunks = [];
       this.onDataAvailable = onDataCallback;
 
-      // Request audio with specific constraints for better compatibility with Whisper
+      // Using optimal audio constraints for Whisper API
       this.stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 16000,
+          autoGainControl: true,
+          sampleRate: 16000, // Whisper works best with 16kHz audio
+          channelCount: 1    // Mono audio for better transcription
         } 
       });
       
-      // Using audio/webm MIME type for better compatibility
+      // Using audio/wav MIME type for better compatibility with Whisper
+      // Fall back to webm if wav isn't supported
+      const mimeType = MediaRecorder.isTypeSupported('audio/wav') 
+        ? 'audio/wav' 
+        : 'audio/webm';
+      
       this.mediaRecorder = new MediaRecorder(this.stream, {
-        mimeType: 'audio/webm',
+        mimeType: mimeType,
+        audioBitsPerSecond: 128000 // Higher bitrate for better quality
       });
 
       this.mediaRecorder.addEventListener("dataavailable", (event) => {
@@ -35,13 +43,14 @@ class VoiceRecorder {
 
       this.mediaRecorder.addEventListener("stop", () => {
         // Combine audio chunks into a single blob
-        const audioBlob = new Blob(this.audioChunks, { type: "audio/webm" });
+        const audioBlob = new Blob(this.audioChunks, { type: mimeType });
         if (this.onDataAvailable) {
           this.onDataAvailable(audioBlob);
         }
       });
 
-      this.mediaRecorder.start();
+      // Use smaller time slices for more frequent data chunks (better streaming)
+      this.mediaRecorder.start(100);
       this.isRecording = true;
       
       return true;

@@ -119,17 +119,25 @@ class ApiService {
     }
 
     try {
-      // Convert audio blob to File object
-      const file = new File([audioBlob], "recording.webm", { type: "audio/webm" });
+      // Convert audio blob to File object with proper format
+      const audioType = audioBlob.type || "audio/webm";
+      const fileExtension = audioType.includes('wav') ? 'wav' : 'webm';
+      const file = new File([audioBlob], `recording.${fileExtension}`, { type: audioType });
       
-      console.log("Using OpenAI API key for transcription:", this.openAiApiKey.substring(0, 10) + "...");
-      console.log("Audio file size:", file.size, "bytes");
+      console.log("Transcribing audio with OpenAI...");
+      console.log("Audio file details:", {
+        size: `${(file.size / 1024).toFixed(2)} KB`,
+        type: file.type,
+        name: file.name
+      });
       
-      // Create form data
+      // Create form data with optimized parameters for Whisper
       const formData = new FormData();
       formData.append("file", file);
       formData.append("model", "whisper-1");
-      formData.append("language", "en"); // You can make this configurable
+      formData.append("language", "en");
+      formData.append("response_format", "json"); // Request JSON response
+      formData.append("temperature", "0.0"); // Lower temperature for more accurate transcription
       
       // Send to OpenAI Whisper API
       const response = await axios.post(
@@ -144,7 +152,7 @@ class ApiService {
       );
 
       if (response.data && response.data.text) {
-        console.log("Transcription result:", response.data.text);
+        console.log("Transcription successful:", response.data.text);
         return response.data.text;
       } else {
         console.error("Unexpected transcription response:", response);
@@ -157,9 +165,13 @@ class ApiService {
       console.error("Transcription error details:", errorMessage);
       toast.error(`Transcription error: ${errorMessage}`);
       
-      // If we get a quota error, suggest checking the billing dashboard
+      // Provide more helpful error messages based on common Whisper API issues
       if (errorMessage.includes("quota") || errorMessage.includes("billing")) {
-        toast.error("OpenAI quota exceeded. Please check your OpenAI billing dashboard to ensure your payment method is valid and you have sufficient credits.");
+        toast.error("OpenAI quota exceeded. Please check your OpenAI billing dashboard.");
+      } else if (errorMessage.includes("file too large")) {
+        toast.error("Audio file is too large. Please record a shorter message.");
+      } else if (errorMessage.includes("could not recognize speech")) {
+        toast.error("No speech detected. Please speak clearly and try again.");
       }
       
       return "Could not transcribe audio. Please try again.";
