@@ -12,9 +12,9 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ onComplete, onDashboard }: WelcomeScreenProps) {
-  // Hardcoded API keys 
+  // Updated OpenAI API key and kept ElevenLabs key the same
   const elevenLabsApiKey = "sk_e2103037e1030bf853e28411fe89320cdfc979d42c50dcad";
-  const openAiApiKey = "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";
+  const openAiApiKey = "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";
   
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");

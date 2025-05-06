@@ -1,3 +1,4 @@
+
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -11,8 +12,9 @@ export interface ChatMessage {
 }
 
 class ApiService {
+  // Updated OpenAI API key and kept ElevenLabs key the same
   private elevenLabsApiKey: string | null = "sk_c94b29279b2e053b449b5c64943363c510c642b709fc79ff";
-  private openAiApiKey: string | null = "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";
+  private openAiApiKey: string | null = "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";
   private voiceId: string = "EXAVITQu4vr4xnSDxMaL"; // Sarah voice ID
   private transcriptionAttempts: number = 0;
   private maxTranscriptionAttempts: number = 3;
