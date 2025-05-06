@@ -1,1 +1,1 @@
-This is an AI voice assistant project
+This is an AI voice assistant project. The AI voice assistant is able to respond to user's queries quickly and accurately regarding questions they may have and is able to remember past conversations. 
