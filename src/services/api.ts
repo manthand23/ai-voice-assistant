@@ -11,7 +11,6 @@ export interface ChatMessage {
 }
 
 class ApiService {
-  // Updated OpenAI API key
   private elevenLabsApiKey: string | null = "sk_c94b29279b2e053b449b5c64943363c510c642b709fc79ff";
   private openAiApiKey: string | null = "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";
   private voiceId: string = "EXAVITQu4vr4xnSDxMaL"; // Sarah voice ID
