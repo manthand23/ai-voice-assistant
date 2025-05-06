@@ -54,7 +54,7 @@ export function Chat({ onEndCall, onDashboard }: ChatProps) {
     }
   };
 
-  // Process the message queue
+
   const processMessageQueue = async () => {
     if (messageQueue.length > 0 && !isSpeaking) {
       const nextMessage = messageQueue[0];
